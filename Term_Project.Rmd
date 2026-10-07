@@ -43,12 +43,21 @@ Data mining is the analysis step of "knowledge discovery in databases" process.
 $$p_k(x)=\frac{\pi_kf_k(x)}{\sum_{l=1}^K\pi_lf_l(x)}$$  
 
 
-```{r}
-summary(cars)
-plot(cars)
-```
+
 
 (b) make comments if needed.
+
+```{r}
+data <- read.csv("TCGA-PANCAN-HiSeq-801x20531/data.csv")
+labels <- read.csv("TCGA-PANCAN-HiSeq-801x20531/labels.csv")
+
+dim(data)
+dim(labels)
+
+head(data)
+head(labels)
+```
+
 
 
 
