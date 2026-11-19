@@ -288,3 +288,54 @@ knn.acc
 KNN accuracy = 1
 
 ### Method 5 (Random forest)
+
+#### Finding mtry for random forest using OOB error
+```{r}
+train.genes <- data.frame(Class = Class.train, expr_log[train, top_genes])
+
+mtrys   <- c(10, 32, 100)
+oob.err <- rep(NA, length(mtrys))
+
+set.seed(1)
+for (m in seq_along(mtrys)) {
+  rf <- randomForest(Class ~ ., data = train.genes, mtry = mtrys[m], ntree = 500)
+  oob.err[m] <- rf$err.rate[500, "OOB"]
+}
+
+data.frame(mtry = mtrys, OOB.error = round(oob.err, 4))
+```
+
+We choose mtry = 100 because it has the lowest error
+
+#### Using random forest with mtry = 100
+```{r}
+set.seed(1)
+rf.fit <- randomForest(Class ~ ., data = train.genes, mtry = 100,
+                       ntree = 500, importance = TRUE)
+rf.class <- predict(rf.fit, newdata = expr_log[test, top_genes])
+
+# Summary
+table(rf.class, Class.test)
+rf.acc <- mean(rf.class == Class.test)
+rf.acc
+```
+
+Random Forest accuracy = 1
+
+### Comparing the methods
+
+```{r}
+results <- data.frame(
+  Method  = c("LDA", "QDA", "Multinomial", "KNN", "Random forest"),
+  Setting = c("5 PCs", "5 PCs", "5 PCs", "10 PCs, k = 5", "mtry = 100"),
+  CV.Error = round(unname(c(colMeans(cv.err)["5"],
+                            colMeans(cv.err.qda)["5"],
+                            colMeans(cv.err.mn)["5"],
+                            knn.err["10", "5"],
+                            oob.err[3])), 4),
+  Test.Accuracy = c(lda.acc, qda.acc, mn.acc, knn.acc, rf.acc)
+)
+results$Test.Mistakes <- round((1 - results$Test.Accuracy) * length(Class.test))
+
+results
+```
