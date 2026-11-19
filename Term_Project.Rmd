@@ -2,11 +2,11 @@
 title: "Term Project"
 author: "Andy Byeon and Giunye Huang Li"
 output:
+  pdf_document: default
   html_document:
     fig_height: 4
     highlight: pygments
     theme: spacelab
-  pdf_document: default
   word_document: default
 ---
 
@@ -25,11 +25,16 @@ labels <- read.csv("TCGA-PANCAN-HiSeq-801x20531/labels.csv")
 dim(data)
 dim(labels)
 
-head(data)
+data[1:5, 1:6]
 head(labels)
+
+# Checks: sample IDs line up, and no missing values
+all(data[, 1] == labels[, 1])
+sum(is.na(data))
+sum(is.na(labels))
 ```
 
-
+#### Exploration
 ```{r}
 # 1. Target Class Frequency Distribution
 class_table <- table(labels$Class)
@@ -39,7 +44,6 @@ colnames(class_df) <- c("CancerType", "Count")
 cat("Target Class Counts:\n")
 class_df
 
-# Plot Class Distribution
 ggplot(class_df, aes(x = reorder(CancerType, -Count), y = Count, fill = CancerType)) +
   geom_bar(stat = "identity", width = 0.6, show.legend = FALSE) +
   geom_text(aes(label = Count), vjust = -0.3, fontface = "bold", size = 3.5) +
@@ -48,34 +52,24 @@ ggplot(class_df, aes(x = reorder(CancerType, -Count), y = Count, fill = CancerTy
        x = "Cancer Type", y = "Number of Samples")
 
 # 2. Log2 Transformation: log2(x + 1)
-# Exclude non-numeric patient ID column if present
-gene_matrix <- data[, sapply(data, is.numeric)]
+Class <- factor(labels$Class)
+gene_matrix <- data[, sapply(data, is.numeric)]   # drops the sample-ID column
 expr_log <- log2(gene_matrix + 1)
 
-# Inspect transformed data summary for the first gene
 summary(expr_log[, 1])
 
-# 3. Variance Filtering & Principal Component Analysis (PCA)
-# Calculate gene-wise variance across all 801 samples
-gene_vars <- apply(expr_log, 2, var)
+# 3. Variance filtering and PCA (all samples, for the exploratory plot only)
+gene_vars_all <- apply(expr_log, 2, var)
+top_1000_all <- head(order(gene_vars_all, decreasing = TRUE), 1000)
+pca_all <- prcomp(expr_log[, top_1000_all], center = TRUE, scale. = TRUE)
 
-# Filter top 1,000 highest-variance genes for dimensionality reduction
-top_1000_genes <- head(order(gene_vars, decreasing = TRUE), 1000)
-filtered_expr <- expr_log[, top_1000_genes]
-
-# Fit Principal Component Analysis (PCA)
-pca_res <- prcomp(filtered_expr, center = TRUE, scale. = TRUE)
-
-# Create PCA plotting dataframe
 pca_df <- data.frame(
-  PC1 = pca_res$x[, 1],
-  PC2 = pca_res$x[, 2],
-  CancerType = factor(labels$Class)
+  PC1 = pca_all$x[, 1],
+  PC2 = pca_all$x[, 2],
+  CancerType = Class
 )
+var_explained <- round(summary(pca_all)$importance[2, 1:2] * 100, 1)
 
-var_explained <- round(summary(pca_res)$importance[2, 1:2] * 100, 1)
-
-# Plot PCA Projection (PC1 vs PC2)
 ggplot(pca_df, aes(x = PC1, y = PC2, color = CancerType)) +
   geom_point(alpha = 0.8, size = 2) +
   theme_minimal() +
@@ -85,7 +79,32 @@ ggplot(pca_df, aes(x = PC1, y = PC2, color = CancerType)) +
        color = "Cancer Type")
 ```
 
+#### Train/test split and preprocessing for modeling (training data only)
+```{r}
+library(MASS)       
+library(class)
+library(e1071)
+library(nnet)
+library(randomForest)
 
+set.seed(1)
+train <- sample(1:nrow(expr_log), 560)            # about 70%
+test  <- (1:nrow(expr_log))[-train]
+Class.train <- Class[train]
+Class.test  <- Class[test]
+
+# Variance filter and PCA using ONLY the training rows
+gene_vars <- apply(expr_log[train, ], 2, var)
+top_genes <- order(gene_vars, decreasing = TRUE)[1:1000]
+pr.out <- prcomp(expr_log[train, top_genes], center = TRUE, scale. = TRUE)
+
+# PC scores: training from the PCA, test projected with the same PCA
+train.pc30 <- pr.out$x[, 1:30]
+test.pc30  <- predict(pr.out, expr_log[test, top_genes])[, 1:30]
+
+dim(train.pc30); dim(test.pc30)
+table(Class.train); table(Class.test)
+```
 
 
 
