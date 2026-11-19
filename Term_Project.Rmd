@@ -106,6 +106,185 @@ dim(train.pc30); dim(test.pc30)
 table(Class.train); table(Class.test)
 ```
 
+### Method 1 (LDA)
 
+#### LDA with PC = 10
+```{r}
+npc <- 10
 
+train.df <- data.frame(Class = Class.train, train.pc30[, 1:npc])
+test.df  <- data.frame(test.pc30[, 1:npc])
 
+# LDA fitted model
+lda.fit   <- lda(Class ~ ., data = train.df)
+lda.pred  <- predict(lda.fit, test.df)
+lda.class <- lda.pred$class
+
+# Summary
+table(lda.class, Class.test)
+mean(lda.class == Class.test)
+```
+
+#### Finding optimal PC for LDA using CV
+```{r}
+set.seed(1)
+folds <- sample(rep(1:10, length.out = length(Class.train)))
+
+npcs   <- c(2, 3, 5, 10, 20, 30)
+cv.err <- matrix(NA, 10, length(npcs), dimnames = list(NULL, npcs))
+
+for (j in 1:10) {                      # j = which fold is held out
+  for (i in seq_along(npcs)) {         # i = which number of PCs we're trying
+    x <- train.pc30[, 1:npcs[i], drop = FALSE]
+    fit  <- lda(x[folds != j, , drop = FALSE], Class.train[folds != j])
+    pred <- predict(fit, x[folds == j, , drop = FALSE])$class
+    cv.err[j, i] <- mean(pred != Class.train[folds == j])
+  }
+}
+
+colMeans(cv.err)
+```
+
+PC = 5 wins because it has the lowest error and it is also the lowest number.
+
+#### Using LDA with PC = 5
+```{r}
+npc <- 5
+
+train.df <- data.frame(Class = Class.train, train.pc30[, 1:npc])
+test.df  <- data.frame(test.pc30[, 1:npc])
+
+# LDA fitted model
+lda.fit   <- lda(Class ~ ., data = train.df)
+lda.pred  <- predict(lda.fit, test.df)
+lda.class <- lda.pred$class
+
+# Summary
+table(lda.class, Class.test)
+lda.acc <- mean(lda.class == Class.test)
+lda.acc
+```
+
+LDA accuracy = 1.
+
+### Method 2 (QDA)
+
+#### Finding PC for QDA using CV
+```{r}
+npcs <- c(2, 3, 5, 10, 20, 30)
+cv.err.qda <- matrix(NA, 10, length(npcs), dimnames = list(NULL, npcs))
+
+for (j in 1:10) {
+  for (i in seq_along(npcs)) {
+    x <- train.pc30[, 1:npcs[i], drop = FALSE]
+    fit  <- qda(x[folds != j, , drop = FALSE], Class.train[folds != j])
+    pred <- predict(fit, x[folds == j, , drop = FALSE])$class
+    cv.err.qda[j, i] <- mean(pred != Class.train[folds == j])
+  }
+}
+
+colMeans(cv.err.qda)
+```
+
+The best PC for QDA is 5 because it has a 0.000000000 or 0% of error.
+
+#### Using QDA with PC = 5
+```{r}
+npc <- 5
+
+train.df <- data.frame(Class = Class.train, train.pc30[, 1:npc])
+test.df  <- data.frame(test.pc30[, 1:npc])
+
+# QDA fitted model
+qda.fit   <- qda(Class ~ ., data = train.df)
+qda.pred  <- predict(qda.fit, test.df)
+qda.class <- qda.pred$class
+
+# Summary
+table(qda.class, Class.test)
+qda.acc <- mean(qda.class == Class.test)
+qda.acc
+```
+
+QDA accuracy = 1
+
+### Method 3 (: Multinomial logistic regression)
+
+#### Finding PC for multinomial using CV
+```{r}
+cv.err.mn <- matrix(NA, 10, length(npcs), dimnames = list(NULL, npcs))
+
+for (j in 1:10) {
+  for (i in seq_along(npcs)) {
+    d <- data.frame(Class = Class.train, train.pc30[, 1:npcs[i], drop = FALSE])
+    fit  <- multinom(Class ~ ., data = d[folds != j, ], maxit = 500, trace = FALSE)
+    pred <- predict(fit, newdata = d[folds == j, ])
+    cv.err.mn[j, i] <- mean(pred != Class.train[folds == j])
+  }
+}
+
+colMeans(cv.err.mn)
+```
+
+The best PC for Multinomial logistic regression is 5 because it has 0.001785714 or 0.179% error.
+
+#### Using multinomial with PC = 5
+```{r}
+npc <- 5
+
+train.df <- data.frame(Class = Class.train, train.pc30[, 1:npc])
+test.df  <- data.frame(test.pc30[, 1:npc])
+
+# Multinomial fitted model
+mn.fit   <- multinom(Class ~ ., data = train.df, maxit = 500, trace = FALSE)
+mn.class <- predict(mn.fit, test.df)
+
+# Summary
+table(mn.class, Class.test)
+mn.acc <- mean(mn.class == Class.test)
+mn.acc
+```
+
+### Method 4 (KNN)
+
+#### Finding PC and k for KNN
+```{r}
+ks <- c(1, 3, 5, 10, 15)
+knn.err <- matrix(NA, length(npcs), length(ks), dimnames = list(npcs, ks))
+
+set.seed(1)
+for (i in seq_along(npcs)) {            # i = number of PCs
+  for (m in seq_along(ks)) {            # m = value of k
+    e <- numeric(10)
+    for (j in 1:10) {                   # j = held-out fold
+      x <- train.pc30[, 1:npcs[i], drop = FALSE]
+      pred <- knn(x[folds != j, , drop = FALSE],
+                  x[folds == j, , drop = FALSE],
+                  Class.train[folds != j], k = ks[m])
+      e[j] <- mean(pred != Class.train[folds == j])
+    }
+    knn.err[i, m] <- mean(e)
+  }
+}
+
+round(knn.err, 4)
+```
+
+We pick PC = 10 and k = 5 because it has the lowest error with 0.0018 or 0.18%
+
+#### Using KNN with PC = 10, k = 5
+```{r}
+npc <- 10
+
+set.seed(1)
+knn.class <- knn(train.pc30[, 1:npc], test.pc30[, 1:npc], Class.train, k = 5)
+
+# Summary
+table(knn.class, Class.test)
+knn.acc <- mean(knn.class == Class.test)
+knn.acc
+```
+
+KNN accuracy = 1
+
+### Method 5 (Random forest)
