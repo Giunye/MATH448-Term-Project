@@ -339,3 +339,37 @@ results$Test.Mistakes <- round((1 - results$Test.Accuracy) * length(Class.test))
 
 results
 ```
+
+### Interpreting the results
+
+#### What the PCs capture
+```{r}
+pve <- 100 * pr.out$sdev^2 / sum(pr.out$sdev^2)
+round(cumsum(pve)[c(2, 5, 10, 20, 30)], 1)    # cumulative % of variance
+
+# genes with the largest weights (loadings) on PC1 and PC2
+head(sort(abs(pr.out$rotation[, 1]), decreasing = TRUE), 10)
+head(sort(abs(pr.out$rotation[, 2]), decreasing = TRUE), 10)
+```
+
+#### Important genes from the random forest
+```{r}
+importance(rf.fit)[order(-importance(rf.fit)[, "MeanDecreaseGini"])[1:10], ]
+
+varImpPlot(rf.fit, n.var = 15, type = 2)
+```
+
+#### Expression of the top 3 genes by tumor type
+````{r, fig.width=6.5, fig.height=3, out.width="100%", fig.align="center"}
+
+top3 <- c("gene_17801", "gene_7964", "gene_9652")
+long <- data.frame(Class = rep(train.genes$Class, 3),
+                   Gene  = rep(top3, each = nrow(train.genes)),
+                   Expr  = unlist(train.genes[, top3], use.names = FALSE))
+
+ggplot(long, aes(x = Class, y = Expr, fill = Class)) +
+  geom_boxplot(show.legend = FALSE) +
+  facet_wrap(~ Gene) +
+  theme_minimal() +
+  labs(x = "Tumor type", y = "log2(expression + 1)")
+````
