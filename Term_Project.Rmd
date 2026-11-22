@@ -145,7 +145,7 @@ for (j in 1:10) {                      # j = which fold is held out
 colMeans(cv.err)
 ```
 
-PC = 5 wins because it has the lowest error and it is also the lowest number.
+PC = 5 is within one sample of the lowest error (30 PCs) and uses the fewest PCs.
 
 #### Using LDA with PC = 5
 ```{r}
@@ -270,8 +270,6 @@ for (i in seq_along(npcs)) {            # i = number of PCs
 round(knn.err, 4)
 ```
 
-We pick PC = 10 and k = 5 because it has the lowest error with 0.0018 or 0.18%
-
 #### Using KNN with PC = 10, k = 5
 ```{r}
 npc <- 10
@@ -387,4 +385,16 @@ perf <- function(pred, truth) {
 all.preds <- list(LDA = lda.class, QDA = qda.class, Multinomial = mn.class,
                   KNN = knn.class, RandomForest = rf.class)
 lapply(all.preds, perf, truth = Class.test)
+```
+
+```{r}
+table(Predicted = mn.class, Actual = Class.test)
+```
+
+```{r}
+round(colMeans(cv.err), 4)       # LDA, all PC counts
+round(colMeans(cv.err.qda), 4)   # QDA
+round(colMeans(cv.err.mn), 4)    # multinomial
+round(knn.err, 4)                # KNN
+data.frame(mtry = mtrys, OOB.error = round(oob.err, 4))
 ```
