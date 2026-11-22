@@ -373,3 +373,18 @@ ggplot(long, aes(x = Class, y = Expr, fill = Class)) +
   theme_minimal() +
   labs(x = "Tumor type", y = "log2(expression + 1)")
 ````
+
+#### Per-class precision, recall and F1
+```{r}
+perf <- function(pred, truth) {
+  cm <- table(pred, truth)                 # rows = predicted, columns = true
+  recall    <- diag(cm) / colSums(cm)
+  precision <- diag(cm) / rowSums(cm)
+  f1 <- 2 * precision * recall / (precision + recall)
+  round(rbind(Precision = precision, Recall = recall, F1 = f1), 3)
+}
+
+all.preds <- list(LDA = lda.class, QDA = qda.class, Multinomial = mn.class,
+                  KNN = knn.class, RandomForest = rf.class)
+lapply(all.preds, perf, truth = Class.test)
+```
